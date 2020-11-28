@@ -1,6 +1,4 @@
-package sample.net;
-
-import java.util.Arrays;
+package net;
 
 public class Start {
 

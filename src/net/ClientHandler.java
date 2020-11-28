@@ -1,4 +1,4 @@
-package sample.net;
+package net;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -12,6 +12,7 @@ public class ClientHandler {
     private DataOutputStream dataOutputStream;
     private DataInputStream inputStream;
     private String nickname ="";
+    private String login ="";
 
     public ClientHandler(Server server, Socket socket) {
         try {
@@ -19,13 +20,13 @@ public class ClientHandler {
             this.socket = socket;
             inputStream = new DataInputStream(socket.getInputStream());
             dataOutputStream = new DataOutputStream(socket.getOutputStream());
-
+            socket.setSoTimeout(120000); // 2 min, а можно тут
             new Thread(()->{
                 try {
                     auth();
                     readMessages();
                 } catch (IOException ex) {
-                    ex.printStackTrace();
+                    System.out.println(ex.getLocalizedMessage());
                 } finally {
                     closeConnections();
                 }
@@ -33,6 +34,7 @@ public class ClientHandler {
 
         } catch (SocketException e){
             System.out.println(nickname + " отключился");
+            server.unsubscribe(this);
         }catch (IOException ex) {
             System.out.println("Непредвиденная ошибка");
         }
@@ -61,15 +63,22 @@ public class ClientHandler {
     private void readMessages() throws IOException  {
         while (true){
             String str = inputStream.readUTF();
-            if (str.equals("/end")) {
-                System.out.println("Client disconnect!");
-                break;
-            }
-            //проверяем на отправку определенному
-            if (str.startsWith("/w ")) {
-                server.messageToNickname(this, str.split("\\s")[1], str.split("\\s")[2]);
+            if(str.startsWith("/")) {
+
+                if (str.equals("/end")) {
+                    dataOutputStream.writeUTF("/end");
+                    break;
+                }
+
+                if (str.startsWith("/w")) {
+                    String[] token = str.split("\\s+", 3);
+                    if (token.length < 3){
+                        continue;
+                    }
+                    server.messageToNickname(this, token[1], token[2]);
+                }
+
             } else {
-                // иначе отправляем всем
                 server.broadcastMessage(this, str);
             }
         }
@@ -81,24 +90,41 @@ public class ClientHandler {
             if (str.startsWith("/auth")){
                 String[] token = str.split("\\s");
                 String newNick = server.getAuthService().getNickNameByLoginAndPass(token[1], token[2]);
+
+                login = token[1];
+
                 if (newNick != null){
-                    if (!server.isNickBusy(newNick)){
+                    if (!server.isLoginAuthenticated(token[1])){
                         nickname = newNick;
-                        message("/authok "+ nickname);
+                        sendMessage("/authok "+ nickname);
                         server.subscribe(this);
                         server.broadcastMessage(this, "Клиент " + nickname + " подключился!");
                         break;
                     } else {
-                        message("Учетная запись уже используется");
+                        sendMessage("Учетная запись уже используется");
                     }
                 } else {
-                    message("Неверный логин или пароль");
+                    sendMessage("Неверный логин или пароль");
+                }
+            }
+
+            if (str.startsWith("/reg")){
+                String[] token = str.split("\\s");
+                if(token.length < 4){
+                    continue;
+                }
+                boolean isRegistration = server.getAuthService()
+                        .doRegistration(token[1], token[2], token[3]);
+                if(isRegistration){
+                    sendMessage("/regok");
+                } else {
+                    sendMessage("/regno");
                 }
             }
         }
     }
 
-    void message(String message){
+    void sendMessage(String message){
         try{
             dataOutputStream.writeUTF(message);
         } catch (IOException e) {
@@ -108,5 +134,9 @@ public class ClientHandler {
 
     public String getNickname() {
         return nickname;
+    }
+
+    public String getLogin() {
+        return login;
     }
 }
