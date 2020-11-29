@@ -1,5 +1,7 @@
 package net;
 
+import javafx.application.Platform;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -67,6 +69,7 @@ public class ClientHandler {
 
                 if (str.equals("/end")) {
                     dataOutputStream.writeUTF("/end");
+
                     break;
                 }
 

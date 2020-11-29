@@ -78,7 +78,6 @@ public class Controller implements Initializable {
     public void initialize(URL url, ResourceBundle resourceBundle) {
         setAuthenticated(false);
         createRegWindow();
-//        clientList.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         Platform.runLater(()->{
             stage = (Stage)textField.getScene().getWindow();
             stage.setOnCloseRequest(windowEvent -> {
@@ -90,6 +89,23 @@ public class Controller implements Initializable {
                 stage.close();
             });
         });
+
+        // таймер на закрытие если в течении 2 минут не авторизовались
+        closeProgramTimeOut(120000);
+    }
+
+    private void closeProgramTimeOut(long timeout) {
+        new Thread(() -> {
+            try {
+                Thread.sleep(timeout);
+                if (socket == null || socket.isClosed()) {
+                    Platform.runLater(() -> stage.close());
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                Platform.runLater(() -> stage.close());
+            }
+        }).start();
     }
 
     private void disconnect() throws UserNotLoginedException {
@@ -150,6 +166,8 @@ public class Controller implements Initializable {
                         if (str.startsWith("/")){
                             if (str.equals("/end")){
                                 System.out.println("Client disconnect!");
+                                // таймер на закрытие если в течении 2 минут не авторизовались
+                                closeProgramTimeOut(120000);
                                 break;
                             }
                             if (str.startsWith("/clientList")){
